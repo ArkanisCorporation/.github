@@ -1,0 +1,57 @@
+name: Runner Fallback
+description: >
+  Checks if any self-hosted runner with the desired label is online and
+  returns either the desired runner label or the fallback label.
+
+inputs:
+  runner:
+    description: Desired runner label (e.g., arkanis-runners)
+    required: true
+  fallback:
+    description: Fallback runner label when no online runner is found
+    required: false
+    default: ubuntu-latest
+  token:
+    description: >
+      Fine-grained PAT with "Organization self-hosted runners" read permission.
+      Use the RUNNER_STATUS_TOKEN org secret.
+    required: true
+  org:
+    description: GitHub organization name
+    required: false
+    default: ArkanisCorporation
+
+outputs:
+  runner:
+    description: Resolved runner label to use for runs-on
+    value: ${{ steps.check.outputs.runner }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check runner availability
+      id: check
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        DESIRED: ${{ inputs.runner }}
+        FALLBACK: ${{ inputs.fallback }}
+        ORG: ${{ inputs.org }}
+      run: |
+        RESPONSE=$(gh api "orgs/${ORG}/actions/runners" 2>/dev/null) || true
+        if [ -z "$RESPONSE" ]; then
+          echo "Warning: Could not reach runners API, falling back to '${FALLBACK}'."
+          echo "runner=${FALLBACK}" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        ONLINE=$(echo "$RESPONSE" | jq --arg r "$DESIRED" \
+          '[.runners[] | select((.labels | map(.name) | contains([$r])) and .status == "online")] | length')
+
+        if [ "${ONLINE:-0}" -gt 0 ]; then
+          echo "${ONLINE} online runner(s) with label '${DESIRED}' found, using self-hosted."
+          echo "runner=${DESIRED}" >> "$GITHUB_OUTPUT"
+        else
+          echo "No online runner with label '${DESIRED}', falling back to '${FALLBACK}'."
+          echo "runner=${FALLBACK}" >> "$GITHUB_OUTPUT"
+        fi
