@@ -2,6 +2,8 @@ name: Runner Fallback
 description: >
   Checks if any self-hosted runner with the desired label is online and
   returns either the desired runner label or the fallback label.
+  Authenticates via a GitHub App to mint short-lived (1h) installation
+  tokens at runtime, eliminating manually-rotated PAT secrets.
 
 inputs:
   runner:
@@ -11,11 +13,21 @@ inputs:
     description: Fallback runner label when no online runner is found
     required: false
     default: ubuntu-latest
-  token:
+  app-client-id:
     description: >
-      Fine-grained PAT with "Organization self-hosted runners" read permission.
-      Use the RUNNER_STATUS_TOKEN org secret.
-    required: true
+      GitHub App Client ID for the App with "Self-hosted runners: Read"
+      organization permission. Source from a public org variable
+      (e.g., vars.RUNNER_STATUS_APP_CLIENT_ID). If empty, the action
+      skips the runner check and returns the fallback runner.
+    required: false
+    default: ''
+  app-private-key:
+    description: >
+      GitHub App private key (full PEM contents). Source from an org
+      secret (e.g., secrets.RUNNER_STATUS_APP_PRIVATE_KEY). If empty,
+      the action skips the runner check and returns the fallback runner.
+    required: false
+    default: ''
   org:
     description: GitHub organization name
     required: false
@@ -29,15 +41,31 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Check runner availability
+    - name: Mint short-lived installation token (read-only)
+      id: app-token
+      if: inputs.app-client-id != '' && inputs.app-private-key != ''
+      uses: actions/create-github-app-token@v3
+      with:
+        client-id: ${{ inputs.app-client-id }}
+        private-key: ${{ inputs.app-private-key }}
+        owner: ${{ inputs.org }}
+        permission-organization-self-hosted-runners: read
+
+    - name: Resolve runner
       id: check
       shell: bash
       env:
-        GH_TOKEN: ${{ inputs.token }}
+        GH_TOKEN: ${{ steps.app-token.outputs.token }}
         DESIRED: ${{ inputs.runner }}
         FALLBACK: ${{ inputs.fallback }}
         ORG: ${{ inputs.org }}
       run: |
+        if [ -z "${GH_TOKEN}" ]; then
+          echo "No GitHub App credentials configured, falling back to '${FALLBACK}'."
+          echo "runner=${FALLBACK}" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
         RESPONSE=$(gh api "orgs/${ORG}/actions/runners" 2>/dev/null) || true
         if [ -z "$RESPONSE" ]; then
           echo "Warning: Could not reach runners API, falling back to '${FALLBACK}'."
