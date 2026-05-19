@@ -65,7 +65,7 @@ Everything we build is shipped for free and developed in our spare time. If our 
 [![Patreon](https://img.shields.io/badge/Patreon-support-FF424D?logo=patreon&logoColor=white)](https://patreon.com/ArkanisCorporation/membership)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/ArkanisCorporation/tiers)
 
-Supporters also get early access to perks like **PatchWatch** — our 60-second Star Citizen patch notifier.
+Supporters also get early access to perks like **[PatchWatch](https://arkanis.cc/PatchWatch)** — our 60-second Star Citizen patch notifier.
 
 ---
 
