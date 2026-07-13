@@ -1,0 +1,17 @@
+#!/bin/sh
+# Enforce Conventional Commits on the subject line (#3). The pattern is the CANONICAL
+# regex — byte-identical to the arkanis-conventional-commits rule in standards.alint.yml and to
+# repo-standards' own .husky/commit-msg hook. Auto-generated Merge/Revert subjects are allowed
+# through. Non-node repo (no package.json), so this is wired via `core.hooksPath` instead of
+# husky — see README.md "Commit messages".
+subject="$(head -n1 "$1")"
+pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?: .+'
+case "$subject" in
+  "Merge "*|"Revert "*) exit 0 ;;
+esac
+if printf '%s' "$subject" | grep -qE "$pattern"; then
+  exit 0
+fi
+echo "✖ Commit message must follow Conventional Commits: type(scope)!: subject" >&2
+echo "  e.g. 'feat: add X', 'fix(scan): handle Y', 'chore!: drop Z'. Got: $subject" >&2
+exit 1
